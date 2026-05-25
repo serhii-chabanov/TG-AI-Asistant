@@ -1,9 +1,8 @@
-# 🌌 Project O.R.I.O.N.
-### Operations, Resources & Information Organizational Network
+# 🌌 Project TG AI Asistant (DEPRECATED)
 
-**O.R.I.O.N.** is an AI-powered command center designed to act as the central nervous system for a homelab by autonomously managing finances, resources, and knowledge. It leverages LLM function calling and RAG to transform a simple assistant into a self-auditing network for total personal and technical management.
+**TG AI Asistant** is an AI-powered command center designed to act as the central nervous system for a homelab by autonomously managing finances, resources, and knowledge. It leverages LLM function calling and RAG to transform a simple assistant into a self-auditing network for total personal and technical management.
 
-**O.R.I.O.N.** is an evolving intelligent ecosystem...
+**TG AI Asistant** is an evolving intelligent ecosystem...
 
 ## Key Features
 
