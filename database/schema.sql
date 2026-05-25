@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS products (
     item_name TEXT NOT NULL,
     status TEXT DEFAULT 'buy', -- buy, stock, low
     category TEXT,
-    last_bought DATETIME
+    last_bought DATETIME,
+    comment TEXT
 );
 
 -- 3. ROUTINE
@@ -76,4 +77,37 @@ CREATE TABLE IF NOT EXISTS bot_state (
     value TEXT,
     updated_at DATETIME DEFAULT (DATETIME('now', 'localtime')),
     PRIMARY KEY (user_id, key)
+);
+
+-- 9. MEDIA & BOOKS
+CREATE TABLE IF NOT EXISTS media_tracker (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    content_type TEXT CHECK(content_type IN ('movie', 'series', 'book', 'anime')) NOT NULL,
+    status TEXT CHECK(status IN ('planning', 'watching', 'completed', 'dropped')) DEFAULT 'planning',
+    progress TEXT,
+    rating INTEGER,
+    comment TEXT,
+    updated_at DATETIME DEFAULT (DATETIME('now', 'localtime'))
+);
+
+-- 10. SPORT & HEALTH
+CREATE TABLE IF NOT EXISTS sport_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    workout_type TEXT NOT NULL,
+    details TEXT,
+    duration_minutes INTEGER,
+    date DATETIME DEFAULT (DATETIME('now', 'localtime'))
+);
+
+-- 11. MEAL PLAN
+CREATE TABLE IF NOT EXISTS meal_plan (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    day_of_week TEXT,
+    meal_type TEXT,
+    dish_name TEXT NOT NULL,
+    dish_description TEXT NOT NULL
 );

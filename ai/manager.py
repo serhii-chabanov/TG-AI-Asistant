@@ -1,5 +1,6 @@
 import json
 import logging
+from collections import defaultdict, deque
 from config import config
 from database.database import db
 
@@ -11,21 +12,28 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "universal_add",
-            "description": "Додати новий запис у базу даних. Використовуй для фінансів, продуктів, звичок тощо.",
+            "description": "Додати один або кілька нових записів у базу даних. Передавай масив об'єктів у параметрі 'records'.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "table_name": {
                         "type": "string", 
-                        "enum": ["finance", "products", "routine", "habits", "events", "general_knowledge"],
+                        "enum": [
+                            "finance", "products", "routine", "habits", "events", 
+                            "general_knowledge", "media_tracker", "sport_logs", "meal_plan"
+                        ],
                         "description": "Назва таблиці для запису."
                     },
-                    "data": {
-                        "type": "object",
-                        "description": "Словник з даними. Наприклад: {'amount': 100, 'record_type': 'expense', 'category': 'Food'}"
+                    "records": {
+                        "type": "array",
+                        "description": "Список об'єктів з даними для додавання. Навіть якщо елемент один, він має бути всередині масиву [].",
+                        "items": {
+                            "type": "object",
+                            "description": "Поля об'єкта відповідно до схеми таблиці."
+                        }
                     }
                 },
-                "required": ["table_name", "data"]
+                "required": ["table_name", "records"]
             }
         }
     },
@@ -33,18 +41,21 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "universal_search",
-            "description": "Пошук інформації, отримання звітів або перевірка списків.",
+            "description": "Пошук інформації, отримання звітів або перевірка списків за фільтрами.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "table_name": {
                         "type": "string",
-                        "enum": ["finance", "products", "routine", "habits", "events", "general_knowledge"],
-                        "description": "В якій таблиці шукати."
+                        "enum": [
+                            "finance", "products", "routine", "habits", "events", 
+                            "general_knowledge", "media_tracker", "sport_logs", "meal_plan"
+                        ],
+                        "description": "В якій таблиці шукать."
                     },
                     "filters": {
                         "type": "object",
-                        "description": "Критерії пошуку (наприклад: {'status': 'buy'} або {'category': 'Food'})."
+                        "description": "Критерії пошуку (наприклад: {'status': 'buy'} або {'meal_type': 'Сніданок'})."
                     }
                 },
                 "required": ["table_name"]
@@ -57,12 +68,14 @@ class AIManager:
     def __init__(self):
         self.client = config.groq_client
         self.model = "llama-3.3-70b-versatile"
+        self.history = defaultdict(lambda: deque(maxlen=50))
 
     async def get_response(self, user_text: str, user_id: int) -> str:
-        messages = [
-            {"role": "system", "content": config.instructions},
-            {"role": "user", "content": user_text}
-        ]
+        messages = [{"role": "system", "content": config.instructions}]
+        messages.extend(list(self.history[user_id]))
+        
+        current_user_message = {"role": "user", "content": user_text}
+        messages.append(current_user_message)
 
         try:
             response = self.client.chat.completions.create(
@@ -76,6 +89,8 @@ class AIManager:
             tool_calls = response_message.tool_calls
 
             if not tool_calls:
+                self.history[user_id].append(current_user_message)
+                self.history[user_id].append({"role": "assistant", "content": response_message.content})
                 return response_message.content
 
             messages.append(response_message)
@@ -90,12 +105,13 @@ class AIManager:
 
                 try:
                     if function_name == "universal_add":
-                        db.add_record(
+                        records_list = arguments.get("records", [])
+                        db.add_records_bulk(
                             table_name=arguments["table_name"],
                             user_id=user_id,
-                            data=arguments["data"]
+                            data_list=records_list
                         )
-                        function_result = f"✅ Успішно додано в таблицю {arguments['table_name']}"
+                        function_result = f"✅ Успішно додано {len(records_list)} запис(ів) в таблицю {arguments['table_name']}"
 
                     elif function_name == "universal_search":
                         records = db.get_records(
@@ -103,7 +119,6 @@ class AIManager:
                             user_id=user_id,
                             filters=arguments.get("filters")
                         )
-
                         function_result = json.dumps(records, ensure_ascii=False)
 
                 except Exception as db_error:
@@ -122,7 +137,12 @@ class AIManager:
                 messages=messages
             )
             
-            return second_response.choices[0].message.content
+            final_content = second_response.choices[0].message.content
+            
+            self.history[user_id].append(current_user_message)
+            self.history[user_id].append({"role": "assistant", "content": final_content})
+            
+            return final_content
 
         except Exception as e:
             logger.error(f"AI Manager error: {e}")

@@ -12,6 +12,7 @@ class Database:
         self.cursor = self.conn.cursor()
         self._create_tables()
 
+
     def _create_tables(self):
         """Read schema.sql from the same directory as this script."""
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +26,7 @@ class Database:
         else:
             print(f"⚠️ Schema not found at: {schema_path}")
 
+
     def add_record(self, table_name: str, user_id: int, data: dict):
         """Universal record addition"""
         data['user_id'] = user_id
@@ -35,6 +37,33 @@ class Database:
         self.cursor.execute(query, list(data.values()))
         self.conn.commit()
 
+
+    def add_records_bulk(self, table_name: str, user_id: int, data_list: list):
+        """Bulk insertion of multiple records in a single transaction"""
+        if not data_list:
+            return
+        
+        prepared_rows = []
+        columns_set = False
+        columns = ""
+        placeholders = ""
+
+        for item in data_list:
+            row_data = dict(item)
+            row_data['user_id'] = user_id
+            
+            if not columns_set:
+                columns = ', '.join(row_data.keys())
+                placeholders = ', '.join(['?'] * len(row_data))
+                columns_set = True
+                
+            prepared_rows.append(list(row_data.values()))
+        
+        query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+        self.cursor.executemany(query, prepared_rows)
+        self.conn.commit()
+
+
     def get_records(self, table_name: str, user_id: int, filters: dict = None):
         """Universal search by filters"""
         query = f"SELECT * FROM {table_name} WHERE user_id = ?"
@@ -42,8 +71,9 @@ class Database:
         
         if filters:
             for key, value in filters.items():
-                query += f" AND {key} LIKE ?"
-                params.append(f"%{value}%")
+                if value is not None and str(value).strip() and str(value).lower() != 'null':
+                    query += f" AND {key} LIKE ?"
+                    params.append(f"%{value}%")
         
         self.cursor.execute(query, tuple(params))
         
@@ -51,5 +81,4 @@ class Database:
         return [dict(zip(cols, row)) for row in self.cursor.fetchall()]
 
 
-# Create a singleton instance
 db = Database()

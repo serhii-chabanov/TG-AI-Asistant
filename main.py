@@ -1,9 +1,12 @@
 import html
 import asyncio
 from aiogram import Dispatcher, types
+import re
 
 from config import config
 from ai.manager import ai
+from hardware_monitor import check_hardware
+from scheduler import setup_scheduler
 
 dp = Dispatcher()
 
@@ -15,10 +18,10 @@ async def handle_message(message: types.Message):
         return
 
     try:
-        response_text = await ai.get_response(message.text, message.from_user.id)
+        response = await ai.get_response(message.text, message.from_user.id)
 
-        if response_text:
-            await message.answer(response_text)
+        if response:
+            await message.answer(response)
         else:
             await message.answer("❌ Error in answering")
 
@@ -29,6 +32,13 @@ async def handle_message(message: types.Message):
 
 
 async def main():
+    admin_id = config.allowed_users[0] if config.allowed_users else 0
+    
+    if admin_id:
+        asyncio.create_task(check_hardware(config.bot, admin_id))
+        setup_scheduler(config.bot, admin_id)
+    
+    print("🚀 Bot starting...")
     await dp.start_polling(config.bot)
 
 
